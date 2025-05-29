@@ -1,243 +1,224 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface BreathingExerciseProps {
-  exerciseType?: 'box' | 'relaxing' | 'energizing';
+  defaultPattern?: 'box' | 'relaxing' | 'energizing';
   showInstructions?: boolean;
 }
 
 const BreathingExercise: React.FC<BreathingExerciseProps> = ({ 
-  exerciseType = 'box',
+  defaultPattern = 'box',
   showInstructions = true
 }) => {
+  const [pattern, setPattern] = useState<'box' | 'relaxing' | 'energizing'>(defaultPattern);
   const [phase, setPhase] = useState<'inhale' | 'hold1' | 'exhale' | 'hold2'>('inhale');
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [isActive, setIsActive] = useState(false);
   const [count, setCount] = useState(0);
-  const [showTextInstructions, setShowTextInstructions] = useState(showInstructions);
+  const [displayInstructions, setDisplayInstructions] = useState(showInstructions);
   
-  const circleRef = useRef<HTMLDivElement>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  
-  // Configure timing based on exercise type
-  const timings = {
+  // Pattern configurations
+  const patterns = {
     box: {
       inhale: 4,
       hold1: 4,
       exhale: 4,
-      hold2: 4
+      hold2: 4,
+      description: "Box breathing (4-4-4-4) helps reduce stress and improve focus."
     },
     relaxing: {
       inhale: 4,
       hold1: 7,
       exhale: 8,
-      hold2: 0
+      hold2: 0,
+      description: "4-7-8 breathing helps calm the nervous system and prepare for sleep."
     },
     energizing: {
       inhale: 6,
       hold1: 0,
       exhale: 2,
-      hold2: 0
+      hold2: 0,
+      description: "Energizing breath (6-0-2-0) increases alertness and energy."
     }
   };
   
-  const currentTiming = timings[exerciseType];
+  const currentPattern = patterns[pattern];
+  const maxCount = currentPattern[phase];
   
-  // Instructions for each phase
-  const instructions = {
-    inhale: "Breathe in slowly through your nose...",
-    hold1: "Hold your breath...",
-    exhale: "Exhale slowly through your mouth...",
-    hold2: "Hold your breath..."
+  // Sound effects
+  const playSound = (sound: string) => {
+    const audio = new Audio(`/audio/${sound}.mp3`);
+    audio.volume = 0.3;
+    audio.play().catch(e => console.error("Error playing sound:", e));
   };
   
-  // Colors for each phase
-  const colors = {
-    inhale: "bg-blue-500",
-    hold1: "bg-purple-500",
-    exhale: "bg-indigo-500",
-    hold2: "bg-teal-500"
-  };
-  
-  // Animation for each phase
+  // Timer logic
   useEffect(() => {
-    if (!isPlaying || !circleRef.current) return;
-    
-    const circle = circleRef.current;
-    
-    // Reset any existing animations
-    circle.style.transition = 'none';
-    
-    // Apply animations based on phase
-    if (phase === 'inhale') {
-      circle.style.transform = 'scale(0.5)';
-      setTimeout(() => {
-        circle.style.transition = `transform ${currentTiming.inhale}s ease-in-out`;
-        circle.style.transform = 'scale(1)';
-      }, 10);
-    } else if (phase === 'exhale') {
-      circle.style.transform = 'scale(1)';
-      setTimeout(() => {
-        circle.style.transition = `transform ${currentTiming.exhale}s ease-in-out`;
-        circle.style.transform = 'scale(0.5)';
-      }, 10);
-    }
-    
-    // Play sound cue
-    if (audioRef.current) {
-      audioRef.current.currentTime = 0;
-      audioRef.current.play().catch(e => console.log("Audio play failed:", e));
-    }
-    
-  }, [phase, isPlaying, exerciseType]);
-  
-  // Timer to control phases
-  useEffect(() => {
-    if (!isPlaying) return;
-    
     let timer: NodeJS.Timeout;
     
-    if (phase === 'inhale') {
-      setCount(currentTiming.inhale);
-      timer = setInterval(() => {
-        setCount(prev => {
-          if (prev <= 1) {
-            clearInterval(timer);
-            setPhase('hold1');
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } else if (phase === 'hold1') {
-      setCount(currentTiming.hold1);
-      if (currentTiming.hold1 === 0) {
-        setPhase('exhale');
-      } else {
-        timer = setInterval(() => {
-          setCount(prev => {
-            if (prev <= 1) {
-              clearInterval(timer);
-              setPhase('exhale');
-              return 0;
-            }
-            return prev - 1;
-          });
+    if (isActive) {
+      if (count < maxCount) {
+        timer = setTimeout(() => {
+          setCount(count + 1);
         }, 1000);
-      }
-    } else if (phase === 'exhale') {
-      setCount(currentTiming.exhale);
-      timer = setInterval(() => {
-        setCount(prev => {
-          if (prev <= 1) {
-            clearInterval(timer);
+      } else {
+        // Move to next phase
+        setCount(0);
+        
+        if (phase === 'inhale') {
+          setPhase('hold1');
+          if (currentPattern.hold1 > 0) {
+            playSound('hold');
+          } else {
+            setPhase('exhale');
+            playSound('exhale');
+          }
+        } else if (phase === 'hold1') {
+          setPhase('exhale');
+          playSound('exhale');
+        } else if (phase === 'exhale') {
+          if (currentPattern.hold2 > 0) {
             setPhase('hold2');
-            return 0;
+            playSound('hold');
+          } else {
+            setPhase('inhale');
+            playSound('inhale');
           }
-          return prev - 1;
-        });
-      }, 1000);
-    } else if (phase === 'hold2') {
-      setCount(currentTiming.hold2);
-      if (currentTiming.hold2 === 0) {
-        setPhase('inhale');
-      } else {
-        timer = setInterval(() => {
-          setCount(prev => {
-            if (prev <= 1) {
-              clearInterval(timer);
-              setPhase('inhale');
-              return 0;
-            }
-            return prev - 1;
-          });
-        }, 1000);
+        } else if (phase === 'hold2') {
+          setPhase('inhale');
+          playSound('inhale');
+        }
       }
     }
     
-    return () => clearInterval(timer);
-  }, [phase, isPlaying, exerciseType]);
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [isActive, count, phase, maxCount, currentPattern]);
   
-  const togglePlay = () => {
-    if (!isPlaying) {
+  // Start/stop the exercise
+  const toggleActive = () => {
+    if (!isActive) {
       setPhase('inhale');
-      setCount(currentTiming.inhale);
+      setCount(0);
+      playSound('inhale');
     }
-    setIsPlaying(!isPlaying);
+    setIsActive(!isActive);
   };
   
-  const resetExercise = () => {
-    setIsPlaying(false);
+  // Change breathing pattern
+  const changePattern = (newPattern: 'box' | 'relaxing' | 'energizing') => {
+    setPattern(newPattern);
     setPhase('inhale');
     setCount(0);
-    if (circleRef.current) {
-      circleRef.current.style.transform = 'scale(0.5)';
+    if (isActive) {
+      playSound('inhale');
     }
   };
   
-  const exerciseNames = {
-    box: "Box Breathing",
-    relaxing: "4-7-8 Relaxing Breath",
-    energizing: "Energizing Breath"
+  // Calculate circle size based on phase
+  const getCircleSize = () => {
+    if (phase === 'inhale') {
+      return 50 + (count / maxCount) * 50;
+    } else if (phase === 'exhale') {
+      return 100 - (count / maxCount) * 50;
+    } else {
+      return phase === 'hold1' ? 100 : 50;
+    }
+  };
+  
+  // Get instruction text
+  const getInstructionText = () => {
+    switch (phase) {
+      case 'inhale': return 'Inhale';
+      case 'hold1': return 'Hold';
+      case 'exhale': return 'Exhale';
+      case 'hold2': return 'Hold';
+      default: return '';
+    }
   };
   
   return (
-    <div className="flex flex-col items-center p-6 bg-gray-50 rounded-xl shadow-lg">
-      <h3 className="text-2xl font-bold mb-4 text-gray-800">{exerciseNames[exerciseType]}</h3>
-      
-      <div className="relative w-64 h-64 mb-6">
-        {/* Outer static circle */}
-        <div className="absolute inset-0 rounded-full border-4 border-dashed border-gray-300"></div>
+    <div className="w-full max-w-md mx-auto">
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold mb-2">Breathing Exercise</h2>
+        <p className="text-gray-600 mb-4">{currentPattern.description}</p>
         
-        {/* Animated breathing circle */}
-        <div 
-          ref={circleRef}
-          className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4/5 h-4/5 rounded-full ${colors[phase]} shadow-lg transform scale-50 flex items-center justify-center`}
-        >
-          <span className="text-white text-4xl font-bold">{count > 0 ? count : ''}</span>
+        <div className="flex space-x-2 mb-4">
+          <button
+            onClick={() => changePattern('box')}
+            className={`px-4 py-2 rounded-full ${
+              pattern === 'box' 
+                ? 'bg-blue-600 text-white' 
+                : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+            }`}
+          >
+            Box Breathing
+          </button>
+          <button
+            onClick={() => changePattern('relaxing')}
+            className={`px-4 py-2 rounded-full ${
+              pattern === 'relaxing' 
+                ? 'bg-blue-600 text-white' 
+                : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+            }`}
+          >
+            Relaxing
+          </button>
+          <button
+            onClick={() => changePattern('energizing')}
+            className={`px-4 py-2 rounded-full ${
+              pattern === 'energizing' 
+                ? 'bg-blue-600 text-white' 
+                : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+            }`}
+          >
+            Energizing
+          </button>
+        </div>
+        
+        <div className="flex items-center mb-4">
+          <input
+            type="checkbox"
+            id="showInstructions"
+            checked={displayInstructions}
+            onChange={() => setDisplayInstructions(!displayInstructions)}
+            className="mr-2"
+          />
+          <label htmlFor="showInstructions">Show text instructions</label>
         </div>
       </div>
       
-      {showTextInstructions && (
-        <div className="mb-6 text-center">
-          <p className="text-lg font-medium text-gray-700">{instructions[phase]}</p>
+      <div className="flex flex-col items-center justify-center">
+        <div className="relative mb-8 w-64 h-64 flex items-center justify-center">
+          <div 
+            className="absolute bg-blue-500 rounded-full transition-all duration-1000"
+            style={{
+              width: `${getCircleSize()}%`,
+              height: `${getCircleSize()}%`,
+              opacity: 0.7
+            }}
+          ></div>
+          
+          {displayInstructions && (
+            <div className="relative z-10 text-center">
+              <div className="text-2xl font-bold">{getInstructionText()}</div>
+              <div className="text-3xl">{count + 1}/{maxCount}</div>
+            </div>
+          )}
         </div>
-      )}
-      
-      <div className="flex space-x-4">
-        <button
-          onClick={togglePlay}
-          className={`px-6 py-2 rounded-lg font-medium ${isPlaying ? 'bg-red-500 hover:bg-red-600' : 'bg-blue-500 hover:bg-blue-600'} text-white transition-colors`}
-        >
-          {isPlaying ? 'Pause' : 'Start'}
-        </button>
         
         <button
-          onClick={resetExercise}
-          className="px-6 py-2 rounded-lg font-medium bg-gray-500 hover:bg-gray-600 text-white transition-colors"
+          onClick={toggleActive}
+          className={`px-6 py-3 rounded-full font-bold ${
+            isActive 
+              ? 'bg-red-500 hover:bg-red-600 text-white' 
+              : 'bg-green-500 hover:bg-green-600 text-white'
+          }`}
         >
-          Reset
+          {isActive ? 'Stop' : 'Start'}
         </button>
       </div>
-      
-      <div className="mt-4 flex items-center">
-        <input
-          type="checkbox"
-          id="showInstructions"
-          checked={showTextInstructions}
-          onChange={() => setShowTextInstructions(!showTextInstructions)}
-          className="mr-2 h-4 w-4"
-        />
-        <label htmlFor="showInstructions" className="text-gray-700">
-          Show text instructions
-        </label>
-      </div>
-      
-      {/* Hidden audio element for sound cues */}
-      <audio ref={audioRef} preload="auto">
-        <source src="/soft-tick.mp3" type="audio/mpeg" />
-        Your browser does not support the audio element.
-      </audio>
     </div>
   );
 };
